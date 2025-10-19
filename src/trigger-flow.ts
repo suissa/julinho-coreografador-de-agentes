@@ -12,6 +12,7 @@ async function triggerFlow() {
       // Add any other initial data needed by the GreetingAgent
     };
 
+    await channel.assertExchange(exchange, 'direct', { durable: false });
     channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(payload)));
     console.log(`[Trigger] Published initial message to ${routingKey} for phone ${payload.phone}`);
 

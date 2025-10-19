@@ -40,7 +40,10 @@ jobs:
       run: bun start > workflow.log 2>&1 &
 
     - name: Wait for engine to start
-      run: sleep 10 # Give the engine time to connect and set up queues
+      run: |
+        echo "Waiting for WorkflowEngine to start..."
+        timeout 30s bash -c 'until grep -q "WorkflowEngine started, waiting for messages..." workflow.log; do sleep 1; done'
+        echo "WorkflowEngine has started."
 
     - name: Trigger the workflow
       env:
@@ -48,7 +51,7 @@ jobs:
       run: bun run src/trigger-flow.ts
 
     - name: Wait for flow to complete
-      run: sleep 10 # Give the agents time to process the messages
+      run: sleep 5 # Give the agents time to process the messages
 
     - name: Verify workflow execution
       run: |
