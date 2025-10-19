@@ -1,0 +1,126 @@
+{
+  "graph": {
+    "id": "client_scheduling_flow",
+    "version": "1.0.0",
+    "description": "Self-routing multi-agent choreography for client registration, scheduling, and payment.",
+    "exchange": "ai.agents",
+    "session_store": {
+      "type": "redis",
+      "key_pattern": "session:{phone}",
+      "ttl_seconds": 300
+    },
+    "entrypoint": "greeting",
+    "nodes": {
+      "greeting": {
+        "id": "greeting",
+        "agent": "GreetingAgent",
+        "type": "router",
+        "context": ["phone"],
+        "actions": [
+          {
+            "condition": "client_exists == false",
+            "publish_to": "client.name",
+            "description": "Starts registration flow for new client."
+          },
+          {
+            "condition": "client_exists == true",
+            "publish_to": "schedule.new",
+            "description": "Skips registration and proceeds to scheduling."
+          }
+        ]
+      },
+      "client.name": {
+        "id": "client.name",
+        "agent": "ClientNameAgent",
+        "subscribe_to": "client.birthdate",
+        "validations": ["name_format", "non_empty"],
+        "context_updates": ["client.name"]
+      },
+      "client.birthdate": {
+        "id": "client.birthdate",
+        "agent": "ClientBirthDateAgent",
+        "subscribe_to": "client.cpf",
+        "validations": ["date_format", "age > 10"],
+        "context_updates": ["client.birthdate"]
+      },
+      "client.cpf": {
+        "id": "client.cpf",
+        "agent": "ClientCPFAgent",
+        "subscribe_to": "client.email",
+        "validations": ["cpf_format", "uniqueness"],
+        "context_updates": ["client.cpf"]
+      },
+      "client.email": {
+        "id": "client.email",
+        "agent": "ClientEmailAgent",
+        "subscribe_to": "schedule.new",
+        "validations": ["email_regex", "uniqueness"],
+        "context_updates": ["client.email"]
+      },
+      "schedule.new": {
+        "id": "schedule.new",
+        "agent": "ScheduleNewAgent",
+        "type": "decision",
+        "decisions": [
+          {
+            "condition": "userPref === 'Date' ",
+            "publish_to": "schedule.date"
+          },
+          {
+            "condition": "userPref == 'Professional'",
+            "publish_to": "schedule.professional"
+          },
+          {
+            "condition": "userPref == 'Service'",
+            "publish_to": "schedule.service"
+          }
+        ],
+        "context_updates": ["schedule.preference"]
+      },
+      "schedule.date": {
+        "id": "schedule.date",
+        "agent": "ScheduleDateAgent",
+        "subscribe_to": "payment",
+        "validations": ["availability_check"],
+        "context_updates": ["schedule.date"]
+      },
+      "schedule.professional": {
+        "id": "schedule.professional",
+        "agent": "ScheduleProfessionalAgent",
+        "subscribe_to": "payment",
+        "validations": ["professional_exists", "availability_check"],
+        "context_updates": ["schedule.professional"]
+      },
+      "schedule.service": {
+        "id": "schedule.service",
+        "agent": "ScheduleServiceAgent",
+        "subscribe_to": "payment",
+        "validations": ["service_exists"],
+        "context_updates": ["schedule.service"]
+      },
+      "payment": {
+        "id": "payment",
+        "agent": "PaymentAgent",
+        "type": "terminal",
+        "publish_to": "whatsapp.send",
+        "context_updates": ["payment.status"],
+        "validations": ["payment_method_valid", "confirmation_required"]
+      }
+    },
+    "edges": [
+      { "from": "greeting", "to": "client.name" },
+      { "from": "greeting", "to": "schedule.new" },
+      { "from": "client.name", "to": "client.birthdate" },
+      { "from": "client.birthdate", "to": "client.cpf" },
+      { "from": "client.cpf", "to": "client.email" },
+      { "from": "client.email", "to": "schedule.new" },
+      { "from": "schedule.new", "to": "schedule.date" },
+      { "from": "schedule.new", "to": "schedule.professional" },
+      { "from": "schedule.new", "to": "schedule.service" },
+      { "from": "schedule.date", "to": "payment" },
+      { "from": "schedule.professional", "to": "payment" },
+      { "from": "schedule.service", "to": "payment" },
+      { "from": "payment", "to": "whatsapp.send" }
+    ]
+  }
+}
