@@ -1,0 +1,66 @@
+name: Agent Choreography CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-run-flow:
+    runs-on: ubuntu-latest
+
+    services:
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v1
+
+    - name: Install dependencies
+      run: bun install
+
+    - name: Run tests
+      run: bun test
+
+    - name: Run workflow engine in background
+      env:
+        RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+        REDIS_URL: redis://localhost:6379
+      run: bun start > workflow.log 2>&1 &
+
+    - name: Wait for engine to start
+      run: |
+        echo "Waiting for WorkflowEngine to start..."
+        timeout 30s bash -c 'until grep -q "WorkflowEngine started, waiting for messages..." workflow.log; do sleep 1; done'
+        echo "WorkflowEngine has started."
+
+    - name: Trigger the workflow
+      env:
+        RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+      run: bun run src/trigger-flow.ts
+
+    - name: Wait for flow to complete
+      run: sleep 5 # Give the agents time to process the messages
+
+    - name: Verify workflow execution
+      run: |
+        echo "--- Workflow Logs ---"
+        cat workflow.log
+        echo "---------------------"
+        if grep -q "PaymentAgent execution" workflow.log; then
+          echo "✅ Workflow completed successfully."
+        else
+          echo "❌ Workflow did not complete."
+          exit 1
+        fi
