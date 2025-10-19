@@ -7,17 +7,19 @@ async function triggerFlow() {
     const exchange = 'ai.agents';
     const routingKey = 'greeting';
 
+    // Randomly select a user preference to test different workflow paths
+    const preferences = ['Date', 'Professional', 'Service'];
+    const randomPreference = preferences[Math.floor(Math.random() * preferences.length)];
+
     const payload = {
-      phone: '+5511999999999', // A unique identifier for the session
-      // Add any other initial data needed by the GreetingAgent
+      phone: `+55119${Math.floor(100000000 + Math.random() * 900000000)}`, // A unique phone for the session
+      user_preference: randomPreference,
     };
 
     await channel.assertExchange(exchange, 'direct', { durable: false });
     channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(payload)));
-    console.log(`[Trigger] Published initial message to ${routingKey} for phone ${payload.phone}`);
+    console.log(`[Trigger] Published initial message to ${routingKey} for phone ${payload.phone} with preference "${payload.user_preference}"`);
 
-    // The script should exit gracefully, so we close the connection.
-    // We add a small delay to ensure the message is sent before closing.
     setTimeout(() => {
       amqpConn.close();
     }, 500);

@@ -23,6 +23,6 @@ export class NodeExecutor {
     }
 
     const agentInstance: Agent = new AgentClass(this.channel, this.redis, { ...session, ...payload });
-    await agentInstance.execute(payload);
+    await agentInstance.execute(node, payload);
   }
 }
